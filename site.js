@@ -1,9 +1,9 @@
 (()=>{'use strict';const region=document.querySelector('.gv-draw');if(region){
 const svg=region.querySelector('.gv-line-d'),path=svg&&svg.querySelector('path');
-const phone=matchMedia('(max-width:767px)');
+const phone=matchMedia('(max-width:1199px), (hover:none), (pointer:coarse)');
 const reduced=matchMedia('(prefers-reduced-motion:reduce)');
 let raf=0,layout=true,samples=[],lineHeight=0,pathLength=0;
-let drawn=null,lastFrame=0;
+
 function measure(){
  if(phone.matches||!path)return;
  const rect=region.getBoundingClientRect(),heading=region.querySelector('.gv-top .gv-h1b');
@@ -27,8 +27,8 @@ function measure(){
  }
 
 }
-function draw(now){
- raf=0;if(phone.matches||!path){lastFrame=0;return;}
+function draw(){
+ raf=0;if(phone.matches||!path)return;
  if(layout){layout=false;measure();}
  const rect=region.getBoundingClientRect();
  // Reveal the actual point at the vertical centre, rather than a fraction of arc length.
@@ -38,18 +38,7 @@ function draw(now){
  const before=samples[Math.max(0,lo-1)],after=samples[Math.min(samples.length-1,lo)];
  const fraction=after.y>before.y?Math.max(0,Math.min(1,(y-before.y)/(after.y-before.y))):0;
  const progress=cursor<=0?0:before.progress+(after.progress-before.progress)*fraction;
- const target=reduced.matches?1:progress;
- if(drawn===null||reduced.matches){drawn=target;}
- else{
-  const dt=Math.min(40,Math.max(1,now-(lastFrame||now-16)));
-  const difference=target-drawn;
-  // Trace every intervening part of a curl, including when its Y direction reverses.
-  const step=Math.sign(difference)*Math.min(Math.abs(difference)*(1-Math.exp(-dt/140)),dt*.00022);
-  drawn=Math.abs(difference)<.00002?target:drawn+step;
- }
- lastFrame=now;
- path.style.strokeDashoffset=String((1-drawn)*pathLength);
- if(Math.abs(target-drawn)>.00002)raf=requestAnimationFrame(draw);
+ path.style.strokeDashoffset=String((1-(reduced.matches?1:progress))*pathLength);
 }
 function schedule(){if(!raf)raf=requestAnimationFrame(draw)}
 function reflow(){layout=true;schedule()}
