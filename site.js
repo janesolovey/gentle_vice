@@ -4,47 +4,34 @@ const mobile=region.querySelector('.gv-line-m');
 const mobilePath=mobile&&mobile.querySelector('path');
 const narrow=matchMedia('(max-width:600px)');
 const reduced=matchMedia('(prefers-reduced-motion:reduce)');
-let raf=0,layout=true,mobileLength=0;
-function route(){
- if(!narrow.matches||!mobilePath)return;
- const r=region.getBoundingClientRect(),w=r.width,h=r.height;
- if(!w||!h)return;
- mobile.setAttribute('viewBox',`0 0 ${w} ${h}`);
- const cards=[...region.querySelectorAll('.gv-story-grid>.gv-card')].map(e=>e.getBoundingClientRect());
- const boxes=[];
- cards.forEach(box=>{const row=boxes[boxes.length-1];if(row&&Math.abs(row.top-box.top)<2)row.bottom=Math.max(row.bottom,box.bottom);else boxes.push({top:box.top,bottom:box.bottom});});
+let raf=0,layout=true,samples=[],lineHeight=0;
+function measure(){
+ if(!mobile)return;
+ if(!narrow.matches){mobile.style.height='';return;}
+ const rect=region.getBoundingClientRect();
  const heading=region.querySelector('.gv-top .gv-h1b');
- const end=heading?heading.getBoundingClientRect().top-r.top: h-24;
- const left=8,right=w-8;
- let x=right,y=12;
- let d=`M ${x} ${y}`;
- boxes.forEach((box,index)=>{
-  const top=Math.max(y,box.top-r.top-10);
-  // Cross only in the space before a card; keep the line outside its image and caption.
-  const next=index%2?left:right;
-  d+=` C ${x} ${y+(top-y)*.5} ${next} ${y+(top-y)*.5} ${next} ${top}`;
-  x=next;y=box.bottom-r.top;
-  d+=` L ${x} ${y}`;
- });
- const finish=Math.max(y,end-12);
- d+=` C ${x} ${y+(finish-y)*.5} ${left} ${y+(finish-y)*.5} ${left} ${finish}`;
- mobilePath.setAttribute('d',d);
- mobileLength=mobilePath.getTotalLength();
+ lineHeight=heading?heading.getBoundingClientRect().top-rect.top:rect.height;
+ mobile.style.height=Math.max(1,lineHeight)+'px';
+ // Keep the original curled SVG. Only measure it; never replace its shape.
+ const length=mobilePath.getTotalLength();
+ let furthest=0;samples=[];
+ for(let i=0;i<=1200;i++){
+  furthest=Math.max(furthest,mobilePath.getPointAtLength(length*i/1200).y);
+  samples.push(furthest/3800);
+ }
 }
 function draw(){
- raf=0;if(layout){layout=false;route();}
- const r=region.getBoundingClientRect();
- const cursor=innerHeight*.78-r.top;
- const progress=reduced.matches?1:Math.max(0,Math.min(1,cursor/r.height));
- paths.forEach(p=>{
-  let amount=progress;
-  if(p===mobilePath&&narrow.matches&&mobileLength&&!reduced.matches){
-   // Mobile route has increasing Y: reveal the point that actually reaches the viewport.
-   let lo=0,hi=mobileLength;
-   for(let i=0;i<18;i++){const mid=(lo+hi)/2;if(p.getPointAtLength(mid).y<cursor)lo=mid;else hi=mid;}
-   amount=cursor<=0?0:cursor>=r.height?1:(lo+hi)/2/mobileLength;
+ raf=0;if(layout){layout=false;measure();}
+ const rect=region.getBoundingClientRect(),cursor=innerHeight*.78-rect.top;
+ paths.forEach(path=>{
+  let progress=Math.max(0,Math.min(1,cursor/rect.height));
+  if(path===mobilePath&&narrow.matches&&samples.length){
+   const y=cursor/lineHeight;
+   let lo=0,hi=samples.length;
+   while(lo<hi){const mid=(lo+hi)>>1;if(samples[mid]<=y)lo=mid+1;else hi=mid;}
+   progress=cursor<=0?0:Math.min(1,Math.max(0,(lo-1)/1200));
   }
-  p.style.strokeDashoffset=String(1-amount);
+  path.style.strokeDashoffset=String(reduced.matches?0:1-progress);
  });
 }
 function schedule(){if(!raf)raf=requestAnimationFrame(draw)}
